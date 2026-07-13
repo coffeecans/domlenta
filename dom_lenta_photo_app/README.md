@@ -49,7 +49,8 @@ gunicorn app:app
 
 В корне репозитория уже есть файлы для Render, а код приложения лежит в `dom_lenta_photo_app/`:
 
-- `dom_lenta_photo_app/requirements.txt` — зависимости приложения, включая `gunicorn` для production-запуска;
+- `dom_lenta_photo_app/requirements.txt` — зависимости Web Service, включая `gunicorn` и `rembg[cpu]`;
+- `dom_lenta_photo_app/requirements-ai.txt` — optional-зависимости для локальной Stable Diffusion генерации на отдельном worker/GPU;
 - `render.yaml` — Blueprint-конфигурация Web Service;
 - `Procfile` — альтернативная команда запуска `web: gunicorn app:app`;
 - `.python-version` и `PYTHON_VERSION` в `render.yaml` — фиксированная версия Python для повторяемой сборки;
@@ -77,9 +78,9 @@ gunicorn app:app
 
 > Важно: приложение хранит исходники и ZIP-архивы во временной файловой системе сервиса. Это подходит для сценария «обработал → скачал», но не для долгосрочного хранения. Для постоянного хранения нужно подключить Render Disk или внешний object storage.
 >
-> AI-зависимости (`rembg`, `diffusers`, `torch`) тяжёлые. Для production-качества контекстных сцен лучше использовать GPU-инстанс или отдельный worker с GPU; бесплатный Render-план может быть слишком слабым для генерации Stable Diffusion.
+> AI-зависимости для локальной генерации сцен (`diffusers`, `torch`) вынесены в `requirements-ai.txt`. Бесплатный Render-план обычно не подходит для Stable Diffusion: используйте отдельный CPU/GPU worker и устанавливайте `pip install -r dom_lenta_photo_app/requirements-ai.txt` там, где реально будет выполняться генерация сцен.
 
 
 ## Render build troubleshooting
 
-Если Render пишет `No matching distribution found for rembg==...`, значит выбранная версия `rembg` не поддерживает Python-версию build image. В `requirements.txt` используется более новая версия `rembg==2.0.76`, а в корне репозитория добавлен `.python-version` с Python `3.12.13`, чтобы Render не брал дефолтный Python 3.14.x, несовместимый с частью AI-зависимостей. Если pip сообщает о конфликте `rembg` и `Pillow`, не фиксируйте `Pillow` вручную: `rembg` сам подтянет совместимую версию Pillow как транзитивную зависимость.
+Если Render сообщает о конфликте между `rembg`, `diffusers`, `transformers` и `accelerate`, не ставьте весь Stable Diffusion стек в базовый Web Service. Базовый `requirements.txt` содержит только web-зависимости и `rembg[cpu]`; локальный Stable Diffusion стек находится в `requirements-ai.txt` и должен устанавливаться на отдельном worker/GPU окружении.

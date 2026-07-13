@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import uuid
@@ -99,6 +100,12 @@ def create_catalog_image(product_cutout: Image.Image, background_color: str) -> 
 
 @lru_cache(maxsize=1)
 def context_scene_pipeline():
+    if importlib.util.find_spec("diffusers") is None or importlib.util.find_spec("torch") is None:
+        raise RuntimeError(
+            "Локальная генерация контекстной сцены не установлена. "
+            "Для CPU/GPU worker установите dom_lenta_photo_app/requirements-ai.txt или подключите отдельный сервис генерации."
+        )
+
     import torch
     from diffusers import StableDiffusionPipeline
 
@@ -195,13 +202,19 @@ def process_batch():
         sku_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_path, sku_dir / original_name)
 
-        process_product_images(
-            source_path=source_path,
-            catalog_path=sku_dir / ai_output_name(sku, 1),
-            context_path=sku_dir / ai_output_name(sku, 2),
-            background_color=background_color,
-            prompt=prompt,
-        )
+        try:
+            process_product_images(
+                source_path=source_path,
+                catalog_path=sku_dir / ai_output_name(sku, 1),
+                context_path=sku_dir / ai_output_name(sku, 2),
+                background_color=background_color,
+                prompt=prompt,
+            )
+        except RuntimeError as error:
+            flash(str(error), "error")
+            shutil.rmtree(result_batch_dir, ignore_errors=True)
+            shutil.rmtree(upload_batch_dir, ignore_errors=True)
+            return redirect(url_for("index"))
         processed_count += 2
 
     zip_path = result_batch_dir / f"dom_lenta_ai_batch_{batch_id}.zip"
