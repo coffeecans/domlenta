@@ -82,4 +82,4 @@ gunicorn app:app
 
 ## Render build troubleshooting
 
-Если Render пишет `No matching distribution found for rembg==...`, значит выбранная версия `rembg` не поддерживает Python-версию build image. В `requirements.txt` используется более новая версия `rembg==2.0.76`, а в корне репозитория добавлен `.python-version` с Python `3.12.13`, чтобы Render не брал дефолтный Python 3.14.x, несовместимый с частью AI-зависимостей. Если pip сообщает о конфликте `rembg` и `Pillow`, используйте диапазон `Pillow>=11.0.0,<12.0.0`, потому что новые версии `rembg` требуют более свежий Pillow, чем `10.4.0`.
+Если Render пишет `No matching distribution found for rembg==...`, значит выбранная версия `rembg` не поддерживает Python-версию build image. В `requirements.txt` используется более новая версия `rembg==2.0.76`, а в корне репозитория добавлен `.python-version` с Python `3.12.13`, чтобы Render не брал дефолтный Python 3.14.x, несовместимый с частью AI-зависимостей. Если pip сообщает о конфликте `rembg` и `Pillow`, не фиксируйте `Pillow` вручную: `rembg` сам подтянет совместимую версию Pillow как транзитивную зависимость.
