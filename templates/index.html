@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DIY Дом Лента — AI обработка фото товаров</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">DIY Дом Лента · PIM-ready</p>
+          <h1>Массовая обработка фотографий товаров нейросетью</h1>
+          <p class="lead">Загрузите папку с изображениями: один файл — один SKU. Настройте фон, ракурсы, контекст и формат имён, а затем скачайте ZIP-архив с результатами.</p>
+        </div>
+      </section>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="messages">
+            {% for category, message in messages %}
+              <p class="message {{ category }}">{{ message }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <form class="panel" action="{{ url_for('process_batch') }}" method="post" enctype="multipart/form-data">
+        <div class="form-grid">
+          <label class="field full">
+            <span>Папка или набор фотографий SKU</span>
+            <input type="file" name="photos" accept="image/png,image/jpeg,image/webp" webkitdirectory directory multiple required>
+            <small>Если браузер не поддерживает выбор папки, выделите несколько файлов вручную.</small>
+          </label>
+
+          <label class="field">
+            <span>Цвет фона</span>
+            <input type="color" name="background_color" value="#f3efe6" required>
+          </label>
+
+          <label class="field">
+            <span>Сколько ракурсов добавить</span>
+            <input type="number" name="angle_count" min="1" max="{{ max_angles }}" value="3" required>
+          </label>
+
+          <label class="field full">
+            <span>Контекст фона для каждого SKU</span>
+            <textarea name="context" rows="3" placeholder="Например: товар в саду на траве, рядом дачные инструменты" required></textarea>
+          </label>
+
+          <label class="field">
+            <span>Префикс новых файлов</span>
+            <input type="text" name="prefix" value="ai_" placeholder="ai_" required>
+          </label>
+
+          <label class="field">
+            <span>Бесплатная нейросеть</span>
+            <select name="model" required>
+              {% for model in models %}
+                <option value="{{ model.code }}">{{ model.title }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+
+        <div class="models">
+          {% for model in models %}
+            <article>
+              <h3>{{ model.title }}</h3>
+              <p>{{ model.description }}</p>
+            </article>
+          {% endfor %}
+        </div>
+
+        <button class="button" type="submit">Обработать фото и подготовить ZIP</button>
+      </form>
+    </main>
+  </body>
+</html>
