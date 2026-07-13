@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import importlib.util
 import os
 import shutil
+import traceback
 import uuid
 import zipfile
 from functools import lru_cache
@@ -10,8 +10,13 @@ from pathlib import Path
 
 from flask import Flask, flash, redirect, render_template, request, send_file, url_for
 from PIL import Image, ImageDraw, ImageFilter
+from dotenv import load_dotenv
 from rembg import new_session, remove
 from werkzeug.utils import secure_filename
+
+from services.flux_kontext import FluxKontextError, generate_context_scene, get_bfl_api_key
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
@@ -20,7 +25,6 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 CANVAS_SIZE = (1400, 1400)
 DEFAULT_BACKGROUND_COLOR = "#FFFFFF"
 APP_VERSION = "v4-ai-bg-removal"
-CONTEXT_MODEL_ID = os.environ.get("CONTEXT_MODEL_ID", "runwayml/stable-diffusion-v1-5")
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-dom-lenta-secret")
@@ -98,59 +102,14 @@ def create_catalog_image(product_cutout: Image.Image, background_color: str) -> 
     return background
 
 
-@lru_cache(maxsize=1)
-def context_scene_pipeline():
-    if importlib.util.find_spec("diffusers") is None or importlib.util.find_spec("torch") is None:
-        raise RuntimeError(
-            "Локальная генерация контекстной сцены не установлена. "
-            "Для CPU/GPU worker установите dom_lenta_photo_app/requirements-ai.txt или подключите отдельный сервис генерации."
-        )
-
-    import torch
-    from diffusers import StableDiffusionPipeline
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.float16 if device == "cuda" else torch.float32
-    pipeline = StableDiffusionPipeline.from_pretrained(CONTEXT_MODEL_ID, torch_dtype=dtype)
-    pipeline = pipeline.to(device)
-    if device == "cuda":
-        pipeline.enable_attention_slicing()
-    return pipeline
-
-
-def generate_ai_scene_background(prompt: str) -> Image.Image:
-    full_prompt = (
-        f"{prompt}. Photorealistic ecommerce product photography scene, realistic lighting, "
-        "clean composition, space in the center for the original product, high quality."
-    )
-    negative_prompt = (
-        "extra duplicate product, changed product design, distorted object, low quality, blurry, "
-        "text, watermark, logo, deformed geometry, bad perspective"
-    )
-    pipeline = context_scene_pipeline()
-    result = pipeline(
-        prompt=full_prompt,
-        negative_prompt=negative_prompt,
-        width=768,
-        height=768,
-        num_inference_steps=int(os.environ.get("CONTEXT_INFERENCE_STEPS", "30")),
-        guidance_scale=float(os.environ.get("CONTEXT_GUIDANCE_SCALE", "7.5")),
-    )
-    return result.images[0].convert("RGBA").resize(CANVAS_SIZE, Image.Resampling.LANCZOS)
-
-
-def create_context_scene(product_cutout: Image.Image, prompt: str) -> Image.Image:
-    scene = generate_ai_scene_background(prompt)
-    product, position = fit_product_on_canvas(product_cutout)
-    scene.alpha_composite(add_product_shadow(product, position, CANVAS_SIZE))
-    scene.alpha_composite(product, position)
-    return scene
+def create_context_scene(catalog_image_path: Path, context_path: Path, prompt: str) -> None:
+    generate_context_scene(catalog_image_path, context_path, prompt)
 
 
 def process_product_images(source_path: Path, catalog_path: Path, context_path: Path, background_color: str, prompt: str) -> None:
     product_cutout = remove_product_background(source_path)
     create_catalog_image(product_cutout, background_color).save(catalog_path, format="PNG", optimize=True)
-    create_context_scene(product_cutout, prompt).save(context_path, format="PNG", optimize=True)
+    create_context_scene(catalog_path, context_path, prompt)
 
 
 def create_zip(folder: Path, zip_path: Path) -> None:
@@ -185,6 +144,10 @@ def process_batch():
         flash("Загрузите хотя бы одно изображение в формате JPG, PNG или WebP.", "error")
         return redirect(url_for("index"))
 
+    if not get_bfl_api_key():
+        flash("Не настроен ключ Black Forest Labs. Добавьте BFL_API_KEY в переменные окружения сервера", "error")
+        return redirect(url_for("index"))
+
     batch_id = uuid.uuid4().hex
     upload_batch_dir = UPLOAD_DIR / batch_id
     result_batch_dir = RESULT_DIR / batch_id
@@ -192,6 +155,7 @@ def process_batch():
     result_batch_dir.mkdir(parents=True, exist_ok=True)
 
     processed_count = 0
+    report_lines: list[str] = []
     for uploaded_file in valid_files:
         original_name = secure_filename(uploaded_file.filename)
         sku = Path(original_name).stem
@@ -210,12 +174,20 @@ def process_batch():
                 background_color=background_color,
                 prompt=prompt,
             )
-        except RuntimeError as error:
-            flash(str(error), "error")
-            shutil.rmtree(result_batch_dir, ignore_errors=True)
-            shutil.rmtree(upload_batch_dir, ignore_errors=True)
-            return redirect(url_for("index"))
+        except FluxKontextError as error:
+            app.logger.error("FLUX Kontext failed for batch %s SKU %s: %s", batch_id, sku, error)
+            report_lines.append(f"{original_name} — ошибка FLUX: {error}")
+            continue
+        except Exception as error:
+            app.logger.error("Batch %s failed for SKU %s", batch_id, sku)
+            app.logger.error(traceback.format_exc())
+            report_lines.append(f"{original_name} — ошибка обработки: {error}")
+            continue
+
         processed_count += 2
+        report_lines.append(f"{original_name} — готово")
+
+    (result_batch_dir / "processing_report.txt").write_text("\n".join(report_lines), encoding="utf-8")
 
     zip_path = result_batch_dir / f"dom_lenta_ai_batch_{batch_id}.zip"
     create_zip(result_batch_dir, zip_path)

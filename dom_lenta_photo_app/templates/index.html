@@ -11,8 +11,8 @@
       <section class="hero">
         <div>
           <div class="hero-top"><p class="eyebrow">DIY Дом Лента · PIM-ready</p><span class="version-badge">{{ app_version }}</span></div>
-          <h1>AI-подготовка товарных фото для каталога и контекста</h1>
-          <p class="lead">Загрузите папку с изображениями SKU. Приложение удалит исходный фон, создаст каталожное фото на выбранном фоне и второе изображение товара в контекстной сцене по промту.</p>
+          <h1>AI-подготовка товарных фото через rembg и FLUX Kontext</h1>
+          <p class="lead">Загрузите папку с изображениями SKU. Приложение удалит исходный фон, создаст каталожное фото на выбранном фоне и отправит его в Black Forest Labs FLUX.1 Kontext [pro] для контекстной сцены.</p>
         </div>
       </section>
 
@@ -30,7 +30,7 @@
         <ol class="steps" aria-label="Пайплайн обработки">
           <li>Загрузить папку с фото</li>
           <li>Выбрать фон каталожного фото</li>
-          <li>Описать сцену использования</li>
+          <li>Описать сцену FLUX</li>
           <li>Скачать ZIP для PIM</li>
         </ol>
 
@@ -48,9 +48,9 @@
           </label>
 
           <label class="field full">
-            <span>Промт для контекстной сцены</span>
-            <textarea name="prompt" rows="4" placeholder="Например: Новогодняя игрушка висит на украшенной новогодней ёлке в домашнем интерьере, фотореалистично." required></textarea>
-            <small>AI-сцена создаётся вокруг вырезанного товара. Товар сохраняется главным объектом изображения.</small>
+            <span>Опишите сцену использования товара</span>
+            <textarea name="prompt" rows="4" placeholder="Например: садовый фонарь установлен рядом с дорожкой в современном саду вечером" required></textarea>
+            <small>Сцена создаётся через облачный API FLUX Kontext. Каталожное фото *_ai_1.png отправляется как входное изображение.</small>
           </label>
         </div>
 
@@ -59,7 +59,15 @@
         </div>
 
         <button class="button" type="submit">Запустить AI-обработку</button>
+        <p class="progress-indicator" hidden>Идёт обработка: удаление фона, генерация FLUX Kontext и сборка ZIP…</p>
       </form>
     </main>
+      <script>
+      const form = document.querySelector("form");
+      const progress = document.querySelector(".progress-indicator");
+      form?.addEventListener("submit", () => {
+        progress.hidden = false;
+      });
+    </script>
   </body>
 </html>

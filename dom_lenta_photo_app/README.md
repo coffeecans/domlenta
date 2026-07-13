@@ -1,18 +1,18 @@
 # DIY Дом Лента — массовая AI-обработка фото товаров
 
-Веб-приложение на Flask для пакетной загрузки фотографий товаров интернет-магазина DIY Дом Лента. Один исходный файл считается одним SKU. Пользователь задаёт цвет каталожного фона и промт контекстной сцены, а приложение удаляет фон товара через open-source AI-модель и формирует ZIP-архив с папками по SKU.
+Веб-приложение на Flask для пакетной обработки фотографий товаров интернет-магазина DIY Дом Лента. Один исходный файл считается одним SKU. Приложение удаляет фон товара через `rembg`, создаёт каталожное фото на выбранном фоне и отправляет это каталожное изображение в облачный официальный API Black Forest Labs FLUX.1 Kontext [pro] для генерации контекстной сцены.
 
 ## Возможности
 
 - массовая загрузка изображений из папки через веб-интерфейс;
-- обязательный ввод только двух параметров партии: цвет каталожного фона и промт контекстной сцены;
+- обязательный ввод только двух параметров партии: цвет каталожного фона и описание контекстной сцены;
 - AI-удаление исходного фона товара через `rembg` / IS-Net;
-- генерация контекстной сцены через open-source Diffusers / Stable Diffusion и сохранение вырезанного товара как главного объекта;
+- генерация контекстной сцены через облачный API Black Forest Labs FLUX.1 Kontext [pro];
+- локальные модели FLUX, Stable Diffusion, `torch`, `diffusers`, `transformers` и CUDA не используются;
 - фиксированные имена результатов `<sku>_ai_1.png` и `<sku>_ai_2.png`;
 - генерация отдельных папок по SKU;
-- скачивание результата ZIP-архивом для последующей загрузки в PIM;
-- временное хранение результатов без обязательного постоянного архива.
-
+- добавление `processing_report.txt` в корень ZIP;
+- скачивание результата ZIP-архивом для последующей загрузки в PIM.
 
 ## Структура результата
 
@@ -26,7 +26,22 @@
 ```
 
 - `*_ai_1.png` — товар с AI-удалением исходного фона на выбранном каталожном фоне;
-- `*_ai_2.png` — товар как главный объект в AI-сгенерированной контекстной сцене по промту.
+- `*_ai_2.png` — контекстная сцена, скачанная из результата FLUX Kontext API;
+- `processing_report.txt` — отчет по каждому SKU: готово или ошибка.
+
+## Настройка Black Forest Labs
+
+1. Создайте API-ключ Black Forest Labs.
+2. Добавьте кредиты в аккаунт Black Forest Labs: каждая генерация `*_ai_2.png` может расходовать платные кредиты.
+3. Установите переменную окружения на сервере:
+
+```bash
+BFL_API_KEY=your_black_forest_labs_api_key
+```
+
+Для локальной разработки можно скопировать `.env.example` в `.env`. Файл `.env` не коммитится.
+
+Без `BFL_API_KEY` обработка не запускается: пользователь увидит сообщение «Не настроен ключ Black Forest Labs. Добавьте BFL_API_KEY в переменные окружения сервера».
 
 ## Локальный запуск
 
@@ -49,8 +64,7 @@ gunicorn app:app
 
 В корне репозитория уже есть файлы для Render, а код приложения лежит в `dom_lenta_photo_app/`:
 
-- `dom_lenta_photo_app/requirements.txt` — зависимости Web Service, включая `gunicorn` и `rembg[cpu]`;
-- `dom_lenta_photo_app/requirements-ai.txt` — optional-зависимости для локальной Stable Diffusion генерации на отдельном worker/GPU;
+- `dom_lenta_photo_app/requirements.txt` — зависимости Web Service, включая `gunicorn`, `rembg[cpu]`, `requests` и `python-dotenv`;
 - `render.yaml` — Blueprint-конфигурация Web Service;
 - `Procfile` — альтернативная команда запуска `web: gunicorn app:app`;
 - `.python-version` и `PYTHON_VERSION` в `render.yaml` — фиксированная версия Python для повторяемой сборки;
@@ -61,8 +75,9 @@ gunicorn app:app
 1. Запушьте текущую ветку в GitHub/GitLab-репозиторий.
 2. В Render откройте **Dashboard → New → Blueprint**.
 3. Подключите репозиторий с этим проектом.
-4. Render прочитает `render.yaml`, установит зависимости командой `pip install --upgrade --no-cache-dir -r dom_lenta_photo_app/requirements.txt` и запустит приложение командой `gunicorn --chdir dom_lenta_photo_app app:app`.
-5. После успешной сборки приложение будет доступно по URL вида `https://<service-name>.onrender.com`.
+4. Добавьте переменную окружения `BFL_API_KEY` в настройках сервиса.
+5. Render прочитает `render.yaml`, установит зависимости командой `pip install --upgrade --no-cache-dir -r dom_lenta_photo_app/requirements.txt` и запустит приложение командой `gunicorn --chdir dom_lenta_photo_app app:app`.
+6. После успешной сборки приложение будет доступно по URL вида `https://<service-name>.onrender.com`.
 
 ### Вариант 2: ручной Web Service
 
@@ -73,14 +88,7 @@ gunicorn app:app
    - **Build Command**: `pip install --upgrade --no-cache-dir -r dom_lenta_photo_app/requirements.txt`;
    - **Start Command**: `gunicorn --chdir dom_lenta_photo_app app:app`;
    - **Health Check Path**: `/healthz`.
-4. В разделе **Environment** добавьте `SECRET_KEY` или используйте автогенерацию из `render.yaml` при Blueprint-деплое.
+4. В разделе **Environment** добавьте `SECRET_KEY` и `BFL_API_KEY`.
 5. Нажмите **Create Web Service** и дождитесь окончания сборки.
 
 > Важно: приложение хранит исходники и ZIP-архивы во временной файловой системе сервиса. Это подходит для сценария «обработал → скачал», но не для долгосрочного хранения. Для постоянного хранения нужно подключить Render Disk или внешний object storage.
->
-> AI-зависимости для локальной генерации сцен (`diffusers`, `torch`) вынесены в `requirements-ai.txt`. Бесплатный Render-план обычно не подходит для Stable Diffusion: используйте отдельный CPU/GPU worker и устанавливайте `pip install -r dom_lenta_photo_app/requirements-ai.txt` там, где реально будет выполняться генерация сцен.
-
-
-## Render build troubleshooting
-
-Если Render сообщает о конфликте между `rembg`, `diffusers`, `transformers` и `accelerate`, не ставьте весь Stable Diffusion стек в базовый Web Service. Базовый `requirements.txt` содержит только web-зависимости и `rembg[cpu]`; локальный Stable Diffusion стек находится в `requirements-ai.txt` и должен устанавливаться на отдельном worker/GPU окружении.

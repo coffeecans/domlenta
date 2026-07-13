@@ -37,6 +37,7 @@ input, textarea { width: 100%; border: 1px solid #d7ded9; border-radius: 16px; p
 input[type="color"] { height: 56px; padding: 6px; }
 textarea { resize: vertical; }
 .output-note { margin: 24px 0; padding: 18px; border-radius: 18px; background: #eef8f1; color: var(--dark); line-height: 1.55; }
+.progress-indicator { margin: 18px 0 0; color: var(--green); font-weight: 900; }
 code { padding: 2px 6px; border-radius: 8px; background: #e3e8e4; }
 .button { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; border: 0; border-radius: 999px; padding: 0 28px; background: var(--green); color: white; font-weight: 900; font-size: 17px; text-decoration: none; cursor: pointer; }
 .secondary-link { display: inline-block; margin-left: 18px; color: var(--green); font-weight: 800; }
