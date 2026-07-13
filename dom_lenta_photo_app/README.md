@@ -30,9 +30,9 @@ gunicorn app:app
 
 ## Деплой на Render.com
 
-В репозитории уже есть файлы для Render:
+В корне репозитория уже есть файлы для Render, а код приложения лежит в `dom_lenta_photo_app/`:
 
-- `requirements.txt` — зависимости приложения, включая `gunicorn` для production-запуска;
+- `dom_lenta_photo_app/requirements.txt` — зависимости приложения, включая `gunicorn` для production-запуска;
 - `render.yaml` — Blueprint-конфигурация Web Service;
 - `Procfile` — альтернативная команда запуска `web: gunicorn app:app`;
 - `runtime.txt` — фиксированная версия Python для повторяемой сборки.
@@ -42,7 +42,7 @@ gunicorn app:app
 1. Запушьте текущую ветку в GitHub/GitLab-репозиторий.
 2. В Render откройте **Dashboard → New → Blueprint**.
 3. Подключите репозиторий с этим проектом.
-4. Render прочитает `render.yaml`, установит зависимости командой `pip install -r requirements.txt` и запустит приложение командой `gunicorn app:app`.
+4. Render прочитает `render.yaml`, установит зависимости командой `pip install -r dom_lenta_photo_app/requirements.txt` и запустит приложение командой `gunicorn --chdir dom_lenta_photo_app app:app`.
 5. После успешной сборки приложение будет доступно по URL вида `https://<service-name>.onrender.com`.
 
 ### Вариант 2: ручной Web Service
@@ -51,8 +51,8 @@ gunicorn app:app
 2. Подключите репозиторий.
 3. Укажите параметры:
    - **Language**: `Python 3`;
-   - **Build Command**: `pip install -r requirements.txt`;
-   - **Start Command**: `gunicorn app:app`;
+   - **Build Command**: `pip install -r dom_lenta_photo_app/requirements.txt`;
+   - **Start Command**: `gunicorn --chdir dom_lenta_photo_app app:app`;
    - **Health Check Path**: `/healthz`.
 4. В разделе **Environment** добавьте `SECRET_KEY` или используйте автогенерацию из `render.yaml` при Blueprint-деплое.
 5. Нажмите **Create Web Service** и дождитесь окончания сборки.
