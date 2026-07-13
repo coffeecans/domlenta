@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: dom-lenta-ai-photo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    healthCheckPath: /healthz
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
