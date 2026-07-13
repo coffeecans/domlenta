@@ -114,10 +114,20 @@ def create_context_scene(catalog_image_path: Path, context_path: Path, prompt: s
     generate_context_scene(catalog_image_path, context_path, prompt)
 
 
-def process_product_images(source_path: Path, catalog_path: Path, context_path: Path, background_color: str, prompt: str) -> None:
+def process_product_images(
+    source_path: Path,
+    catalog_path: Path,
+    context_path: Path,
+    background_color: str,
+    prompt: str,
+    generate_scene: bool,
+) -> int:
     product_cutout = remove_product_background(source_path)
     create_catalog_image(product_cutout, background_color).save(catalog_path, format="PNG", optimize=True)
+    if not generate_scene:
+        return 1
     create_context_scene(catalog_path, context_path, prompt)
+    return 2
 
 
 def create_zip(folder: Path, zip_path: Path) -> None:
@@ -142,8 +152,9 @@ def process_batch():
     files = request.files.getlist("photos")
     background_color = request.form.get("background_color", DEFAULT_BACKGROUND_COLOR)
     prompt = request.form.get("prompt", "").strip()
+    generate_scene = request.form.get("generate_scene") == "on"
 
-    if not prompt:
+    if generate_scene and not prompt:
         flash("Введите промт для контекстной сцены использования товара.", "error")
         return redirect(url_for("index"))
 
@@ -152,8 +163,8 @@ def process_batch():
         flash("Загрузите хотя бы одно изображение в формате JPG, PNG или WebP.", "error")
         return redirect(url_for("index"))
 
-    if not get_bfl_api_key():
-        flash("Не настроен ключ Black Forest Labs. Добавьте BFL_API_KEY в переменные окружения сервера", "error")
+    if generate_scene and not get_bfl_api_key():
+        flash("Для генерации сцен необходимо указать BFL_API_KEY.", "error")
         return redirect(url_for("index"))
 
     batch_id = uuid.uuid4().hex
@@ -175,12 +186,13 @@ def process_batch():
         shutil.copy2(source_path, sku_dir / original_name)
 
         try:
-            process_product_images(
+            created_images = process_product_images(
                 source_path=source_path,
                 catalog_path=sku_dir / ai_output_name(sku, 1),
                 context_path=sku_dir / ai_output_name(sku, 2),
                 background_color=background_color,
                 prompt=prompt,
+                generate_scene=generate_scene,
             )
         except FluxKontextError as error:
             app.logger.error("FLUX Kontext failed for batch %s SKU %s: %s", batch_id, sku, error)
@@ -192,7 +204,7 @@ def process_batch():
             report_lines.append(f"{original_name} — ошибка обработки: {error}")
             continue
 
-        processed_count += 2
+        processed_count += created_images
         report_lines.append(f"{original_name} — готово")
 
     (result_batch_dir / "processing_report.txt").write_text("\n".join(report_lines), encoding="utf-8")

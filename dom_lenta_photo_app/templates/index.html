@@ -30,7 +30,7 @@
         <ol class="steps" aria-label="Пайплайн обработки">
           <li>Загрузить папку с фото</li>
           <li>Выбрать фон каталожного фото</li>
-          <li>Описать сцену FLUX</li>
+          <li>Опционально включить FLUX</li>
           <li>Скачать ZIP для PIM</li>
         </ol>
 
@@ -47,24 +47,43 @@
             <small>По умолчанию используется белый фон #FFFFFF.</small>
           </label>
 
-          <label class="field full">
+          <label class="field full checkbox-field">
+            <input type="checkbox" name="generate_scene" id="generate_scene">
+            <span>Генерировать сцену использования товара (FLUX Kontext)</span>
+          </label>
+
+          <label class="field full scene-prompt" hidden>
             <span>Опишите сцену использования товара</span>
-            <textarea name="prompt" rows="4" placeholder="Например: садовый фонарь установлен рядом с дорожкой в современном саду вечером" required></textarea>
+            <textarea name="prompt" rows="4" placeholder="Например: Садовая лейка стоит возле клумбы с цветами солнечным утром." disabled></textarea>
             <small>Сцена создаётся через облачный API FLUX Kontext. Каталожное фото *_ai_1.png отправляется как входное изображение.</small>
           </label>
         </div>
 
         <div class="output-note">
-          <strong>Формат результата:</strong> для файла <code>902884_1.png</code> будут созданы <code>902884_1_ai_1.png</code> и <code>902884_1_ai_2.png</code>.
+          <strong>Формат результата:</strong> для файла <code>902884_1.png</code> всегда создаётся <code>902884_1_ai_1.png</code>. Если включить FLUX Kontext, дополнительно создаётся <code>902884_1_ai_2.png</code>.
         </div>
 
         <button class="button" type="submit">Запустить AI-обработку</button>
-        <p class="progress-indicator" hidden>Идёт обработка: удаление фона, генерация FLUX Kontext и сборка ZIP…</p>
+        <p class="progress-indicator" hidden>Идёт обработка: удаление фона, при необходимости генерация FLUX Kontext и сборка ZIP…</p>
       </form>
     </main>
       <script>
       const form = document.querySelector("form");
       const progress = document.querySelector(".progress-indicator");
+      const generateScene = document.querySelector("#generate_scene");
+      const scenePrompt = document.querySelector(".scene-prompt");
+      const promptInput = scenePrompt?.querySelector("textarea");
+
+      function syncScenePrompt() {
+        const enabled = Boolean(generateScene?.checked);
+        scenePrompt.hidden = !enabled;
+        promptInput.disabled = !enabled;
+        promptInput.required = enabled;
+      }
+
+      generateScene?.addEventListener("change", syncScenePrompt);
+      syncScenePrompt();
+
       form?.addEventListener("submit", () => {
         progress.hidden = false;
       });

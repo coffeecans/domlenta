@@ -12,7 +12,7 @@
         <div class="hero-top centered"><p class="eyebrow">Готово к загрузке в PIM</p><span class="version-badge">{{ app_version }}</span></div>
         <h1>ZIP-архив сформирован</h1>
         <p class="lead">Обработано SKU: <strong>{{ sku_count }}</strong>. Создано AI-изображений: <strong>{{ processed_count }}</strong>.</p>
-        <p class="result-format">В каждой папке SKU лежат оригинал, <code>*_ai_1.png</code> — каталожное фото без исходного фона, <code>*_ai_2.png</code> — контекстная сцена.</p>
+        <p class="result-format">В каждой папке SKU лежат оригинал и <code>*_ai_1.png</code> — каталожное фото без исходного фона. Если FLUX Kontext был включён и завершился успешно, также будет <code>*_ai_2.png</code>. Подробности — в <code>processing_report.txt</code>.</p>
         <a class="button" href="{{ download_url }}">Скачать архив</a>
         <a class="secondary-link" href="{{ url_for('index') }}">Запустить новую обработку</a>
       </section>

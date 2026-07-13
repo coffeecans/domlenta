@@ -30,6 +30,8 @@ h1 { margin: 0; font-size: clamp(32px, 5vw, 54px); line-height: 1.04; }
 .steps li::before { counter-increment: step; content: counter(step); position: absolute; left: 16px; top: 14px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; background: var(--green); color: white; font-size: 14px; }
 .form-grid { display: grid; grid-template-columns: minmax(220px, 360px) 1fr; gap: 20px; }
 .field { display: grid; gap: 9px; font-weight: 800; }
+.checkbox-field { display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: 18px; background: #eef8f1; }
+.checkbox-field input { width: 20px; height: 20px; margin: 0; }
 .field.full { grid-column: 1 / -1; }
 .field.compact { max-width: 360px; }
 .field small { font-weight: 500; color: var(--muted); }
