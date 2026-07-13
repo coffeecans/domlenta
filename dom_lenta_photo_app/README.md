@@ -60,7 +60,7 @@ gunicorn app:app
 1. Запушьте текущую ветку в GitHub/GitLab-репозиторий.
 2. В Render откройте **Dashboard → New → Blueprint**.
 3. Подключите репозиторий с этим проектом.
-4. Render прочитает `render.yaml`, установит зависимости командой `pip install -r dom_lenta_photo_app/requirements.txt` и запустит приложение командой `gunicorn --chdir dom_lenta_photo_app app:app`.
+4. Render прочитает `render.yaml`, установит зависимости командой `pip install --upgrade --no-cache-dir -r dom_lenta_photo_app/requirements.txt` и запустит приложение командой `gunicorn --chdir dom_lenta_photo_app app:app`.
 5. После успешной сборки приложение будет доступно по URL вида `https://<service-name>.onrender.com`.
 
 ### Вариант 2: ручной Web Service
@@ -69,7 +69,7 @@ gunicorn app:app
 2. Подключите репозиторий.
 3. Укажите параметры:
    - **Language**: `Python 3`;
-   - **Build Command**: `pip install -r dom_lenta_photo_app/requirements.txt`;
+   - **Build Command**: `pip install --upgrade --no-cache-dir -r dom_lenta_photo_app/requirements.txt`;
    - **Start Command**: `gunicorn --chdir dom_lenta_photo_app app:app`;
    - **Health Check Path**: `/healthz`.
 4. В разделе **Environment** добавьте `SECRET_KEY` или используйте автогенерацию из `render.yaml` при Blueprint-деплое.
@@ -82,4 +82,4 @@ gunicorn app:app
 
 ## Render build troubleshooting
 
-Если Render пишет `No matching distribution found for rembg==...`, значит выбранная версия `rembg` не поддерживает Python-версию build image. В `requirements.txt` используется более новая версия `rembg==2.0.76`, а в корне репозитория добавлен `.python-version` с Python `3.12.13`, чтобы Render не брал дефолтный Python 3.14.x, несовместимый с частью AI-зависимостей.
+Если Render пишет `No matching distribution found for rembg==...`, значит выбранная версия `rembg` не поддерживает Python-версию build image. В `requirements.txt` используется более новая версия `rembg==2.0.76`, а в корне репозитория добавлен `.python-version` с Python `3.12.13`, чтобы Render не брал дефолтный Python 3.14.x, несовместимый с частью AI-зависимостей. Если pip сообщает о конфликте `rembg` и `Pillow`, используйте диапазон `Pillow>=11.0.0,<12.0.0`, потому что новые версии `rembg` требуют более свежий Pillow, чем `10.4.0`.

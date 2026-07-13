@@ -3,7 +3,7 @@ services:
     name: dom-lenta-ai-photo
     runtime: python
     plan: free
-    buildCommand: pip install -r dom_lenta_photo_app/requirements.txt
+    buildCommand: pip install --upgrade --no-cache-dir -r dom_lenta_photo_app/requirements.txt
     startCommand: gunicorn --chdir dom_lenta_photo_app app:app
     healthCheckPath: /healthz
     envVars:
