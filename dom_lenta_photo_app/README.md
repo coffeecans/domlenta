@@ -60,6 +60,22 @@ flask --app app run --debug
 gunicorn app:app
 ```
 
+
+## Ограничения памяти Render Free
+
+Render Free ограничивает Web Service примерно 512 МБ RAM. Чтобы обработка не падала по памяти, приложение по умолчанию использует более лёгкую модель `rembg` `u2netp`, уменьшает входное изображение для background removal до `1280x1280` и создаёт итоговый canvas `1024x1024`. Эти параметры можно менять переменными окружения:
+
+```bash
+REMBG_MODEL=u2netp
+MAX_REMBG_INPUT_SIZE=1280
+OUTPUT_CANVAS_SIZE=1024
+REMBG_ALPHA_MATTING=false
+```
+
+Alpha matting отключён по умолчанию для экономии памяти; включайте `REMBG_ALPHA_MATTING=true` только на инстансе с большим объёмом RAM.
+
+Если нужно обрабатывать большие изображения в максимальном качестве, используйте платный Render instance с большим объёмом памяти или вынесите background removal в отдельный worker.
+
 ## Деплой на Render.com
 
 В корне репозитория уже есть файлы для Render, а код приложения лежит в `dom_lenta_photo_app/`:

@@ -22,7 +22,11 @@ BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 RESULT_DIR = BASE_DIR / "results"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-CANVAS_SIZE = (1400, 1400)
+OUTPUT_CANVAS_SIZE = int(os.environ.get("OUTPUT_CANVAS_SIZE", "1024"))
+MAX_REMBG_INPUT_SIZE = int(os.environ.get("MAX_REMBG_INPUT_SIZE", "1280"))
+REMBG_MODEL = os.environ.get("REMBG_MODEL", "u2netp")
+REMBG_ALPHA_MATTING = os.environ.get("REMBG_ALPHA_MATTING", "false").lower() == "true"
+CANVAS_SIZE = (OUTPUT_CANVAS_SIZE, OUTPUT_CANVAS_SIZE)
 DEFAULT_BACKGROUND_COLOR = "#FFFFFF"
 APP_VERSION = "v4-ai-bg-removal"
 
@@ -51,21 +55,25 @@ def ai_output_name(sku: str, index: int) -> str:
 
 @lru_cache(maxsize=1)
 def background_removal_session():
-    return new_session("isnet-general-use")
+    return new_session(REMBG_MODEL)
 
 
 def remove_product_background(source_path: Path) -> Image.Image:
-    """Use rembg/IS-Net to cut the main product out of the original photo."""
+    """Use rembg to cut the main product out while staying within small Render memory limits."""
     with Image.open(source_path) as image:
         source = image.convert("RGBA")
+        source.thumbnail((MAX_REMBG_INPUT_SIZE, MAX_REMBG_INPUT_SIZE), Image.Resampling.LANCZOS)
+        source.load()
+
     cutout = remove(
         source,
         session=background_removal_session(),
-        alpha_matting=True,
+        alpha_matting=REMBG_ALPHA_MATTING,
         alpha_matting_foreground_threshold=240,
         alpha_matting_background_threshold=10,
         alpha_matting_erode_size=10,
     )
+    source.close()
     return cutout.convert("RGBA")
 
 
