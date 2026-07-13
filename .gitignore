@@ -1,7 +1,7 @@
 .venv/
 __pycache__/
 *.py[cod]
-dom_lenta_photo_app/uploads/*
-dom_lenta_photo_app/results/*
-!dom_lenta_photo_app/uploads/.gitkeep
-!dom_lenta_photo_app/results/.gitkeep
+uploads/*
+results/*
+!uploads/.gitkeep
+!results/.gitkeep

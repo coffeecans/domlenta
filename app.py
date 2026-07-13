@@ -151,11 +151,6 @@ def index():
     return render_template("index.html", models=MODEL_PRESETS, max_angles=MAX_ANGLES)
 
 
-@app.route("/healthz", methods=["GET"])
-def healthz():
-    return {"status": "ok"}
-
-
 @app.route("/process", methods=["POST"])
 def process_batch():
     files = request.files.getlist("photos")
