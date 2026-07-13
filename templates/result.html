@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Архив готов — DIY Дом Лента</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  </head>
+  <body>
+    <main class="page narrow">
+      <section class="panel success-panel">
+        <p class="eyebrow">Готово к загрузке в PIM</p>
+        <h1>ZIP-архив сформирован</h1>
+        <p class="lead">Обработано SKU: <strong>{{ sku_count }}</strong>. Создано новых изображений: <strong>{{ processed_count }}</strong>.</p>
+        <a class="button" href="{{ download_url }}">Скачать архив</a>
+        <a class="secondary-link" href="{{ url_for('index') }}">Запустить новую обработку</a>
+      </section>
+    </main>
+  </body>
+</html>
