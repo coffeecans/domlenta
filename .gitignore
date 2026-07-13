@@ -1,6 +1,14 @@
 .venv/
 __pycache__/
 *.py[cod]
+
+# Runtime files for the root app layout used on main.
+uploads/*
+results/*
+!uploads/.gitkeep
+!results/.gitkeep
+
+# Runtime files for the isolated Dom Lenta photo-processing app.
 dom_lenta_photo_app/uploads/*
 dom_lenta_photo_app/results/*
 !dom_lenta_photo_app/uploads/.gitkeep

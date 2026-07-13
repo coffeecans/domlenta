@@ -52,7 +52,8 @@ gunicorn app:app
 - `dom_lenta_photo_app/requirements.txt` — зависимости приложения, включая `gunicorn` для production-запуска;
 - `render.yaml` — Blueprint-конфигурация Web Service;
 - `Procfile` — альтернативная команда запуска `web: gunicorn app:app`;
-- `runtime.txt` — фиксированная версия Python для повторяемой сборки.
+- `.python-version` и `PYTHON_VERSION` в `render.yaml` — фиксированная версия Python для повторяемой сборки;
+- `runtime.txt` — дополнительная совместимость для Heroku-style окружений.
 
 ### Вариант 1: Blueprint через `render.yaml`
 
@@ -77,3 +78,8 @@ gunicorn app:app
 > Важно: приложение хранит исходники и ZIP-архивы во временной файловой системе сервиса. Это подходит для сценария «обработал → скачал», но не для долгосрочного хранения. Для постоянного хранения нужно подключить Render Disk или внешний object storage.
 >
 > AI-зависимости (`rembg`, `diffusers`, `torch`) тяжёлые. Для production-качества контекстных сцен лучше использовать GPU-инстанс или отдельный worker с GPU; бесплатный Render-план может быть слишком слабым для генерации Stable Diffusion.
+
+
+## Render build troubleshooting
+
+Если Render пишет `No matching distribution found for rembg==...`, значит выбранная версия `rembg` не поддерживает Python-версию build image. В `requirements.txt` используется более новая версия `rembg==2.0.76`, а в корне репозитория добавлен `.python-version` с Python `3.12.13`, чтобы Render не брал дефолтный Python 3.14.x, несовместимый с частью AI-зависимостей.

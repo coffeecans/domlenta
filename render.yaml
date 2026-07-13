@@ -7,5 +7,7 @@ services:
     startCommand: gunicorn --chdir dom_lenta_photo_app app:app
     healthCheckPath: /healthz
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
       - key: SECRET_KEY
         generateValue: true
