@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DIY Дом Лента — AI обработка фото товаров</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v=app_version) }}">
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <div class="hero-top"><p class="eyebrow">DIY Дом Лента · PIM-ready</p><span class="version-badge">{{ app_version }}</span></div>
+          <h1>AI-подготовка товарных фото через rembg и FLUX Kontext</h1>
+          <p class="lead">Загрузите папку с изображениями SKU. Приложение удалит исходный фон, создаст каталожное фото на выбранном фоне и отправит его в Black Forest Labs FLUX.1 Kontext [pro] для контекстной сцены.</p>
+        </div>
+      </section>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="messages">
+            {% for category, message in messages %}
+              <p class="message {{ category }}">{{ message }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <form class="panel" action="{{ url_for('process_batch') }}" method="post" enctype="multipart/form-data">
+        <ol class="steps" aria-label="Пайплайн обработки">
+          <li>Загрузить папку с фото</li>
+          <li>Выбрать фон каталожного фото</li>
+          <li>Опционально включить FLUX</li>
+          <li>Скачать ZIP для PIM</li>
+        </ol>
+
+        <div class="form-grid">
+          <label class="field full">
+            <span>Папка или набор фотографий SKU</span>
+            <input type="file" name="photos" accept="image/png,image/jpeg,image/webp" webkitdirectory directory multiple required>
+            <small>Один файл считается одним SKU. В архиве для каждого SKU будет отдельная папка.</small>
+          </label>
+
+          <label class="field compact">
+            <span>Цвет фона каталожного фото</span>
+            <input type="color" name="background_color" value="{{ default_background_color }}" required>
+            <small>По умолчанию используется белый фон #FFFFFF.</small>
+          </label>
+
+          <label class="field full checkbox-field">
+            <input type="checkbox" name="generate_scene" id="generate_scene">
+            <span>Генерировать сцену использования товара (FLUX Kontext)</span>
+          </label>
+
+          <label class="field full scene-prompt" hidden>
+            <span>Опишите сцену использования товара</span>
+            <textarea name="prompt" rows="4" placeholder="Например: Садовая лейка стоит возле клумбы с цветами солнечным утром." disabled></textarea>
+            <small>Сцена создаётся через облачный API FLUX Kontext. Каталожное фото *_ai_1.png отправляется как входное изображение.</small>
+          </label>
+        </div>
+
+        <div class="output-note">
+          <strong>Формат результата:</strong> для файла <code>902884_1.png</code> всегда создаётся <code>902884_1_ai_1.png</code>. Если включить FLUX Kontext, дополнительно создаётся <code>902884_1_ai_2.png</code>.
+        </div>
+
+        <button class="button" type="submit">Запустить AI-обработку</button>
+        <p class="progress-indicator" hidden>Идёт обработка: удаление фона, при необходимости генерация FLUX Kontext и сборка ZIP…</p>
+      </form>
+    </main>
+      <script>
+      const form = document.querySelector("form");
+      const progress = document.querySelector(".progress-indicator");
+      const generateScene = document.querySelector("#generate_scene");
+      const scenePrompt = document.querySelector(".scene-prompt");
+      const promptInput = scenePrompt?.querySelector("textarea");
+
+      function syncScenePrompt() {
+        const enabled = Boolean(generateScene?.checked);
+        scenePrompt.hidden = !enabled;
+        promptInput.disabled = !enabled;
+        promptInput.required = enabled;
+      }
+
+      generateScene?.addEventListener("change", syncScenePrompt);
+      syncScenePrompt();
+
+      form?.addEventListener("submit", () => {
+        progress.hidden = false;
+      });
+    </script>
+  </body>
+</html>
