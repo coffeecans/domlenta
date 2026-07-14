@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Обработка запущена — DIY Дом Лента</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v=app_version) }}">
+  </head>
+  <body>
+    <main class="page narrow">
+      <section class="panel success-panel">
+        <div class="hero-top centered"><p class="eyebrow">Обработка выполняется</p><span class="version-badge">{{ app_version }}</span></div>
+        <h1>Пакет поставлен в очередь</h1>
+        <p class="lead" id="job-message">Подготовка…</p>
+        <p class="result-format">Страница обновляет статус автоматически. Не нужно повторно нажимать кнопку обработки.</p>
+        <a class="button" id="download-link" href="#" hidden>Скачать архив</a>
+        <a class="secondary-link" href="{{ url_for('index') }}">Запустить новую обработку</a>
+      </section>
+    </main>
+    <script>
+      const message = document.querySelector('#job-message');
+      const downloadLink = document.querySelector('#download-link');
+
+      async function pollStatus() {
+        const response = await fetch('{{ url_for('job_status', batch_id=batch_id) }}', { cache: 'no-store' });
+        const data = await response.json();
+        message.textContent = `${data.message || 'Обработка…'}${data.processed_count !== undefined ? ` · создано файлов: ${data.processed_count}` : ''}`;
+        if (data.status === 'done') {
+          downloadLink.href = data.download_url;
+          downloadLink.hidden = false;
+          return;
+        }
+        if (data.status === 'missing') {
+          message.textContent = data.message || 'Задача не найдена';
+          return;
+        }
+        setTimeout(pollStatus, 2000);
+      }
+
+      pollStatus().catch(() => {
+        message.textContent = 'Не удалось получить статус задачи. Обновите страницу.';
+      });
+    </script>
+  </body>
+</html>

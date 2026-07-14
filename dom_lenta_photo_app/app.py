@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import os
+import threading
 import shutil
 import traceback
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 
-from flask import Flask, flash, redirect, render_template, request, send_file, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, url_for
 from PIL import Image, ImageDraw, ImageFilter
 from dotenv import load_dotenv
 from rembg import new_session, remove
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 from services.flux_kontext import FluxKontextError, generate_context_scene, get_bfl_api_key
@@ -33,6 +36,10 @@ APP_VERSION = "v4-ai-bg-removal"
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-dom-lenta-secret")
 app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024
+
+JOBS: dict[str, dict[str, object]] = {}
+JOBS_LOCK = threading.Lock()
+EXECUTOR = ThreadPoolExecutor(max_workers=int(os.environ.get("MAX_BACKGROUND_JOBS", "1")))
 
 
 def allowed_image(filename: str) -> bool:
@@ -137,6 +144,64 @@ def create_zip(folder: Path, zip_path: Path) -> None:
                 archive.write(file_path, file_path.relative_to(folder))
 
 
+def update_job(batch_id: str, **updates: object) -> None:
+    with JOBS_LOCK:
+        JOBS.setdefault(batch_id, {}).update(updates)
+
+
+def run_batch_processing(
+    batch_id: str,
+    uploaded_items: list[tuple[Path, str, str]],
+    result_batch_dir: Path,
+    background_color: str,
+    prompt: str,
+    generate_scene: bool,
+) -> None:
+    processed_count = 0
+    report_lines: list[str] = []
+    update_job(batch_id, status="running", message="Обработка SKU", processed_count=0)
+
+    for index, (source_path, original_name, sku) in enumerate(uploaded_items, start=1):
+        update_job(batch_id, message=f"Обработка {original_name} ({index}/{len(uploaded_items)})")
+        sku_dir = result_batch_dir / sku
+        sku_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, sku_dir / original_name)
+
+        try:
+            created_images = process_product_images(
+                source_path=source_path,
+                catalog_path=sku_dir / ai_output_name(sku, 1),
+                context_path=sku_dir / ai_output_name(sku, 2),
+                background_color=background_color,
+                prompt=prompt,
+                generate_scene=generate_scene,
+            )
+        except FluxKontextError as error:
+            app.logger.error("FLUX Kontext failed for batch %s SKU %s: %s", batch_id, sku, error)
+            report_lines.append(f"{original_name} — ошибка FLUX: {error}")
+            continue
+        except Exception as error:
+            app.logger.error("Batch %s failed for SKU %s", batch_id, sku)
+            app.logger.error(traceback.format_exc())
+            report_lines.append(f"{original_name} — ошибка обработки: {error}")
+            continue
+
+        processed_count += created_images
+        report_lines.append(f"{original_name} — готово")
+        update_job(batch_id, processed_count=processed_count)
+
+    (result_batch_dir / "processing_report.txt").write_text("\n".join(report_lines), encoding="utf-8")
+    zip_path = result_batch_dir / f"dom_lenta_ai_batch_{batch_id}.zip"
+    create_zip(result_batch_dir, zip_path)
+    update_job(batch_id, status="done", message="ZIP-архив готов", processed_count=processed_count)
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_large_upload(_error):
+    flash("Загруженные файлы слишком большие. Уменьшите размер партии или сожмите изображения.", "error")
+    return redirect(url_for("index"))
+
+
 @app.route("/", methods=["GET"])
 def index():
     return render_template("index.html", default_background_color=DEFAULT_BACKGROUND_COLOR, app_version=APP_VERSION)
@@ -173,52 +238,54 @@ def process_batch():
     upload_batch_dir.mkdir(parents=True, exist_ok=True)
     result_batch_dir.mkdir(parents=True, exist_ok=True)
 
-    processed_count = 0
-    report_lines: list[str] = []
+    uploaded_items: list[tuple[Path, str, str]] = []
     for uploaded_file in valid_files:
         original_name = secure_filename(uploaded_file.filename)
         sku = Path(original_name).stem
         source_path = upload_batch_dir / original_name
         uploaded_file.save(source_path)
+        uploaded_items.append((source_path, original_name, sku))
 
-        sku_dir = result_batch_dir / sku
-        sku_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source_path, sku_dir / original_name)
-
-        try:
-            created_images = process_product_images(
-                source_path=source_path,
-                catalog_path=sku_dir / ai_output_name(sku, 1),
-                context_path=sku_dir / ai_output_name(sku, 2),
-                background_color=background_color,
-                prompt=prompt,
-                generate_scene=generate_scene,
-            )
-        except FluxKontextError as error:
-            app.logger.error("FLUX Kontext failed for batch %s SKU %s: %s", batch_id, sku, error)
-            report_lines.append(f"{original_name} — ошибка FLUX: {error}")
-            continue
-        except Exception as error:
-            app.logger.error("Batch %s failed for SKU %s", batch_id, sku)
-            app.logger.error(traceback.format_exc())
-            report_lines.append(f"{original_name} — ошибка обработки: {error}")
-            continue
-
-        processed_count += created_images
-        report_lines.append(f"{original_name} — готово")
-
-    (result_batch_dir / "processing_report.txt").write_text("\n".join(report_lines), encoding="utf-8")
-
-    zip_path = result_batch_dir / f"dom_lenta_ai_batch_{batch_id}.zip"
-    create_zip(result_batch_dir, zip_path)
-    return render_template(
-        "result.html",
-        batch_id=batch_id,
-        processed_count=processed_count,
-        sku_count=len(valid_files),
-        download_url=url_for("download_batch", batch_id=batch_id),
-        app_version=APP_VERSION,
+    update_job(
+        batch_id,
+        status="queued",
+        message="Задача поставлена в очередь",
+        sku_count=len(uploaded_items),
+        processed_count=0,
     )
+    EXECUTOR.submit(
+        run_batch_processing,
+        batch_id,
+        uploaded_items,
+        result_batch_dir,
+        background_color,
+        prompt,
+        generate_scene,
+    )
+    return redirect(url_for("job_page", batch_id=batch_id))
+
+
+@app.route("/job/<batch_id>", methods=["GET"])
+def job_page(batch_id: str):
+    safe_batch_id = secure_filename(batch_id)
+    with JOBS_LOCK:
+        job = JOBS.get(safe_batch_id)
+    if not job:
+        flash("Задача обработки не найдена. Запустите обработку заново.", "error")
+        return redirect(url_for("index"))
+    return render_template("job.html", batch_id=safe_batch_id, app_version=APP_VERSION)
+
+
+@app.route("/job/<batch_id>/status", methods=["GET"])
+def job_status(batch_id: str):
+    safe_batch_id = secure_filename(batch_id)
+    with JOBS_LOCK:
+        job = dict(JOBS.get(safe_batch_id, {}))
+    if not job:
+        return jsonify({"status": "missing", "message": "Задача не найдена"}), 404
+    if job.get("status") == "done":
+        job["download_url"] = url_for("download_batch", batch_id=safe_batch_id)
+    return jsonify(job)
 
 
 @app.route("/download/<batch_id>", methods=["GET"])
