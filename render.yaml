@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install --upgrade --no-cache-dir -r dom_lenta_photo_app/requirements.txt
-    startCommand: gunicorn --chdir dom_lenta_photo_app app:app
+    startCommand: gunicorn --chdir dom_lenta_photo_app --workers 1 --threads 4 --timeout 600 app:app
     healthCheckPath: /healthz
     envVars:
       - key: PYTHON_VERSION

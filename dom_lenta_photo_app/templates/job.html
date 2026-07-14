@@ -22,24 +22,31 @@
       const downloadLink = document.querySelector('#download-link');
 
       async function pollStatus() {
-        const response = await fetch('{{ url_for('job_status', batch_id=batch_id) }}', { cache: 'no-store' });
-        const data = await response.json();
-        message.textContent = `${data.message || 'Обработка…'}${data.processed_count !== undefined ? ` · создано файлов: ${data.processed_count}` : ''}`;
-        if (data.status === 'done') {
-          downloadLink.href = data.download_url;
-          downloadLink.hidden = false;
-          return;
+        try {
+          const response = await fetch('{{ url_for('job_status', batch_id=batch_id) }}', { cache: 'no-store' });
+          if (!response.ok) {
+            message.textContent = `Сервис временно занят обработкой, повторная проверка статуса… (${response.status})`;
+            setTimeout(pollStatus, 3000);
+            return;
+          }
+          const data = await response.json();
+          message.textContent = `${data.message || 'Обработка…'}${data.processed_count !== undefined ? ` · создано файлов: ${data.processed_count}` : ''}`;
+          if (data.status === 'done') {
+            downloadLink.href = data.download_url;
+            downloadLink.hidden = false;
+            return;
+          }
+          if (data.status === 'missing') {
+            message.textContent = data.message || 'Задача не найдена';
+            return;
+          }
+        } catch (error) {
+          message.textContent = 'Сервис временно не ответил, повторная проверка статуса…';
         }
-        if (data.status === 'missing') {
-          message.textContent = data.message || 'Задача не найдена';
-          return;
-        }
-        setTimeout(pollStatus, 2000);
+        setTimeout(pollStatus, 3000);
       }
 
-      pollStatus().catch(() => {
-        message.textContent = 'Не удалось получить статус задачи. Обновите страницу.';
-      });
+      pollStatus();
     </script>
   </body>
 </html>
